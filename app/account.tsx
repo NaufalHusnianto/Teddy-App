@@ -91,7 +91,7 @@ export default function Account() {
 
         <TouchableOpacity
           style={styles.menuItem}
-          onPress={() => router.push("/account")}
+          onPress={() => router.push("/about")}
         >
           <Ionicons name="information-circle" size={20} color="black" />
           <Text style={styles.menuText}>About Us</Text>
@@ -105,7 +105,7 @@ export default function Account() {
       </View>
 
       <TouchableOpacity onPress={confirmLogout} style={styles.logoutButton}>
-        <Text style={{ color: "#fff" }}>Logout</Text>
+        <Text style={{ color: "#fff", fontWeight: "bold" }}>Logout</Text>
       </TouchableOpacity>
 
       <Modal

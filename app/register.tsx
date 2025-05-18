@@ -20,7 +20,7 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false); // Loading state tambahan
+  const [loading, setLoading] = useState(false);
 
   const { user, loading: authLoading } = useAuth();
 
@@ -58,12 +58,10 @@ export default function Register() {
         password
       );
 
-      // Simpan display name
       await updateProfile(userCredential.user, {
         displayName: name,
       });
 
-      // Redirect setelah sukses register dan update profile
       router.replace("/dashboard");
     } catch (err) {
       setError("Failed to register. Please try again.");
@@ -79,42 +77,50 @@ export default function Register() {
       resizeMode="cover"
     >
       <View style={styles.overlay} />
-      <Text style={styles.title}>Register</Text>
-      <Image
-        source={require("../assets/images/Company.png")}
-        style={{
-          width: 240,
-          height: 80,
-          marginBottom: 40,
-          marginTop: 20,
-          marginHorizontal: "auto",
-        }}
-      />
+
+      <View style={styles.header}>
+        <Text style={styles.title}>Register</Text>
+        <Image
+          source={require("../assets/images/Company.png")}
+          style={styles.logo}
+        />
+      </View>
 
       <View style={styles.formContainer}>
+        <Text style={styles.label}>Full Name</Text>
         <TextInput
-          placeholder="Full Name"
+          placeholder="Enter your name"
+          placeholderTextColor="#666"
           value={name}
           onChangeText={setName}
           style={styles.input}
         />
+
+        <Text style={styles.label}>Email</Text>
         <TextInput
-          placeholder="Email"
+          placeholder="Enter your email"
+          placeholderTextColor="#666"
           value={email}
           onChangeText={setEmail}
           style={styles.input}
           autoCapitalize="none"
           keyboardType="email-address"
         />
+
+        <Text style={styles.label}>Password</Text>
         <TextInput
-          placeholder="Password"
+          placeholder="Enter your password"
+          placeholderTextColor="#666"
           value={password}
           onChangeText={setPassword}
           style={styles.input}
           secureTextEntry
         />
+
+        <Text style={styles.label}>Confirm Password</Text>
         <TextInput
-          placeholder="Confirm Password"
+          placeholder="Re-enter your password"
+          placeholderTextColor="#666"
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           style={styles.input}
@@ -122,17 +128,14 @@ export default function Register() {
         />
 
         <TouchableOpacity style={styles.button} onPress={handleRegister}>
-          <Text style={{ color: "#fff", fontWeight: "bold" }}>Register</Text>
+          <Text style={styles.buttonText}>Register</Text>
         </TouchableOpacity>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <Text>
+        <Text style={styles.bottomText}>
           Already have an account?{" "}
-          <Text
-            style={styles.link}
-            onPress={() => router.push("/login")} // push ke login
-          >
+          <Text style={styles.link} onPress={() => router.push("/login")}>
             Login
           </Text>
         </Text>
@@ -153,33 +156,47 @@ const styles = StyleSheet.create({
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(16, 100, 164, 0.8)", // semi-transparent blue
+    backgroundColor: "rgba(16, 100, 164, 0.8)",
   },
-  formContainer: {
-    borderTopLeftRadius: 50,
-    borderTopRightRadius: 50,
-    backgroundColor: "#fff",
-    height: "85%",
-    padding: 24,
+  header: {
     alignItems: "center",
-    gap: 20,
-    paddingTop: 50,
+    marginTop: 60,
   },
   title: {
     fontSize: 28,
     fontWeight: "bold",
-    textAlign: "center",
     color: "#fff",
-    marginTop: 50,
+    marginBottom: 10,
+  },
+  logo: {
+    width: 240,
+    height: 80,
+    resizeMode: "contain",
+  },
+  formContainer: {
+    flex: 1,
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    padding: 24,
+    paddingTop: 40,
+    alignItems: "center",
+    gap: 14,
+  },
+  label: {
+    alignSelf: "flex-start",
+    marginBottom: -10,
+    marginLeft: 10,
+    fontWeight: "600",
   },
   input: {
     height: 48,
     width: "100%",
     borderColor: "#ccc",
     borderWidth: 1,
-    marginBottom: 16,
     paddingHorizontal: 12,
     borderRadius: 20,
+    backgroundColor: "#f9f9f9",
   },
   button: {
     backgroundColor: "#007AFF",
@@ -188,13 +205,23 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     width: "60%",
     alignItems: "center",
+    marginTop: 10,
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "bold",
   },
   error: {
-    marginTop: 12,
     color: "red",
     textAlign: "center",
+    marginTop: 10,
+  },
+  bottomText: {
+    marginTop: 20,
+    fontSize: 14,
   },
   link: {
     color: "#007AFF",
+    fontWeight: "bold",
   },
 });

@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Redirect, router } from "expo-router";
 import {
   addDoc,
@@ -8,7 +9,7 @@ import {
   serverTimestamp,
   where,
 } from "firebase/firestore";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Image,
   Modal,
@@ -27,16 +28,46 @@ export default function Dashboard() {
   const [babyDevices, setBabyDevices] = useState<any[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [newBaby, setNewBaby] = useState({ name: "", age: "" });
+  const prevDevicesRef = useRef<any[]>([]); // Gunakan useRef agar tidak trigger re-render
 
   useEffect(() => {
     if (!user) return;
 
     const q = query(collection(db, "babies"), where("userId", "==", user.uid));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
       const babies = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       })) as any[];
+
+      // Deteksi perubahan kategori suhu
+      for (let baby of babies) {
+        const prev = prevDevicesRef.current.find((d) => d.id === baby.id);
+        if (
+          prev &&
+          getTemperatureCategory(prev.temp) !==
+            getTemperatureCategory(baby.temp)
+        ) {
+          const kategoriBaru = getTemperatureCategory(baby.temp);
+          const info = {
+            name: baby.name,
+            category: kategoriBaru,
+            time: new Date().toISOString(),
+          };
+
+          try {
+            const existing = await AsyncStorage.getItem("notifications");
+            const parsed = existing ? JSON.parse(existing) : [];
+            parsed.push(info);
+            await AsyncStorage.setItem("notifications", JSON.stringify(parsed));
+            console.log("Notifikasi disimpan:", info);
+          } catch (e) {
+            console.error("Gagal menyimpan notifikasi ke AsyncStorage", e);
+          }
+        }
+      }
+
+      prevDevicesRef.current = babies; // Update ref setelah loop selesai
       setBabyDevices(babies);
     });
 
@@ -63,30 +94,29 @@ export default function Dashboard() {
     if (temp > 40.6) return "Demam Sangat Tinggi";
     if (temp >= 40.0) return "Demam Tinggi";
     if (temp >= 39.0) return "Demam Sedang";
-    if (temp >= 37.8) return "Demam Ringan";
-    if (temp >= 36.4 && temp <= 37.5) return "Normal";
+    if (temp >= 37.6) return "Demam Ringan";
+    if (temp >= 36.4 && temp <= 37.5) return "Suhu Normal";
     return "Belum Terdeteksi";
   };
 
   const getCardColor = (tempStr: number) => {
     const category = getTemperatureCategory(tempStr);
     switch (category) {
-      case "Normal":
-        return "#d0f0c0"; // hijau muda
+      case "Suhu Normal":
+        return "#d0f0c0";
       case "Demam Ringan":
-        return "#fff4cc"; // kuning muda
+        return "#fff4cc";
       case "Demam Sedang":
-        return "#ffdf99"; // oranye
+        return "#ffdf99";
       case "Demam Tinggi":
-        return "#ffc2b3"; // merah muda
+        return "#ffc2b3";
       case "Demam Sangat Tinggi":
-        return "#ff8c8c"; // merah terang
+        return "#ff8c8c";
       default:
-        return "#e0e0e0"; // abu-abu
+        return "#e0e0e0";
     }
   };
 
-  // ⛔ Jangan panggil hook secara kondisional — render kondisi di bawah ini saja
   if (!user) {
     return <Redirect href="/login" />;
   }
@@ -94,7 +124,10 @@ export default function Dashboard() {
   return (
     <View style={styles.container}>
       {/* Header Profil */}
-      <View style={styles.profileCard}>
+      <TouchableOpacity
+        style={styles.profileCard}
+        onPress={() => router.push("/account")}
+      >
         <Image
           source={
             user.photoURL
@@ -108,11 +141,11 @@ export default function Dashboard() {
           <Text style={styles.goodParent}>Good Parents!</Text>
         </View>
         <TouchableOpacity
-          onPress={() => router.push("/account")}
+          onPress={() => router.push("/notification")}
           style={styles.accountButton}
         >
           <Ionicons
-            name="settings-outline"
+            name="notifications"
             size={20}
             color={"#3185c4"}
             style={{
@@ -122,7 +155,7 @@ export default function Dashboard() {
             }}
           />
         </TouchableOpacity>
-      </View>
+      </TouchableOpacity>
 
       <Text style={styles.title}>Baby Status</Text>
 
@@ -131,10 +164,10 @@ export default function Dashboard() {
         {babyDevices.map((device) => {
           const category = getTemperatureCategory(device.temp);
           const iconName =
-            category === "Normal"
+            category === "Suhu Normal"
               ? "checkmark-circle-outline"
               : "warning-outline";
-          const iconColor = category === "Normal" ? "green" : "red";
+          const iconColor = category === "Suhu Normal" ? "green" : "red";
 
           return (
             <TouchableOpacity
@@ -156,7 +189,8 @@ export default function Dashboard() {
               />
               <View>
                 <Text style={styles.deviceName}>{device.name}</Text>
-                <Text style={{ color: "#6b6b6b" }}>{category}</Text>
+                <Text style={{ color: "#6b6b6b" }}>{device.temp} °C</Text>
+                <Text style={{ fontWeight: "bold" }}>{category}</Text>
               </View>
               <Ionicons
                 name={iconName}

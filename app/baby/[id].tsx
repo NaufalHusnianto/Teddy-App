@@ -13,16 +13,14 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { LineChart } from "react-native-gifted-charts";
 import { db } from "../../firebaseConfig";
 
 export default function BabyDetail() {
   const { id } = useLocalSearchParams();
   const [baby, setBaby] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-
-  // State untuk edit mode
   const [isEditing, setIsEditing] = useState(false);
-  // State untuk form edit
   const [editName, setEditName] = useState("");
   const [editAge, setEditAge] = useState("");
 
@@ -33,7 +31,6 @@ export default function BabyDetail() {
       if (docSnap.exists()) {
         const data = docSnap.data();
         setBaby({ id: docSnap.id, ...data });
-        // Set form awal dari data bayi
         setEditName(data.name || "");
         setEditAge(String(data.age || ""));
       } else {
@@ -49,7 +46,7 @@ export default function BabyDetail() {
     if (temp > 40.6) return "Demam Sangat Tinggi";
     if (temp >= 40.0) return "Demam Tinggi";
     if (temp >= 39.0) return "Demam Sedang";
-    if (temp >= 37.8) return "Demam Ringan";
+    if (temp >= 37.6) return "Demam Ringan";
     if (temp >= 36.4 && temp <= 37.5) return "Normal";
     return "Belum Terdeteksi";
   };
@@ -58,12 +55,11 @@ export default function BabyDetail() {
     if (temp > 40.6) return "#ff4d4d";
     if (temp >= 40.0) return "#ff4d4d";
     if (temp >= 39.0) return "#ffb347";
-    if (temp >= 37.8) return "#ffb347";
+    if (temp >= 37.6) return "#ffb347";
     if (temp >= 36.4 && temp <= 37.5) return "#2a9d8f";
     return "#e0e0e0";
   };
 
-  // Fungsi simpan update data bayi ke Firestore
   const saveEdit = async () => {
     if (!editName || !editAge) {
       Alert.alert("Error", "Semua kolom harus diisi.");
@@ -95,10 +91,7 @@ export default function BabyDetail() {
       "Konfirmasi",
       "Apakah Anda yakin ingin menghapus data bayi ini?",
       [
-        {
-          text: "Batal",
-          style: "cancel",
-        },
+        { text: "Batal", style: "cancel" },
         {
           text: "Hapus",
           style: "destructive",
@@ -106,8 +99,6 @@ export default function BabyDetail() {
             try {
               await deleteDoc(doc(db, "babies", String(id)));
               Alert.alert("Sukses", "Data bayi berhasil dihapus.");
-              // Kembali ke halaman sebelumnya
-              // (asumsi kamu menggunakan expo-router)
               router.back();
             } catch (error) {
               console.error(error);
@@ -137,89 +128,95 @@ export default function BabyDetail() {
 
   const tempColor = getTempColor(baby.temp);
 
+  const data = [{ value: 15 }, { value: 30 }, { value: 26 }, { value: 40 }];
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      {/* Circle Temp */}
+      {/* Suhu Bayi */}
       <View style={[styles.circle, { borderColor: tempColor }]}>
         <Text style={styles.temp}>{baby.temp}°C</Text>
       </View>
 
-      {/* Temp Status */}
       <Text style={[styles.status, { backgroundColor: tempColor + "33" }]}>
         <Ionicons name="thermometer" size={20} color={tempColor} />{" "}
         {getTemperatureCategory(baby.temp)}
       </Text>
 
-      {/* Baby Info */}
-      {!isEditing ? (
-        <>
-          <TouchableOpacity
-            style={styles.infoCard}
-            onPress={() => setIsEditing(true)}
-          >
-            <Image
-              source={require("../../assets/images/baby-boy.png")}
-              style={styles.image}
-            />
-            <View style={{ marginLeft: 16 }}>
-              <Text style={styles.name}>{baby.name}</Text>
-              <Text style={styles.info}>Umur: {baby.age} bulan</Text>
-            </View>
-          </TouchableOpacity>
-        </>
-      ) : (
-        <>
-          {/* Form Edit */}
-          <View style={styles.editCard}>
-            <Text style={styles.label}>Nama Bayi</Text>
-            <TextInput
-              style={styles.input}
-              value={editName}
-              onChangeText={setEditName}
-              placeholder="Nama Bayi"
-            />
-
-            <Text style={styles.label}>Umur (bulan)</Text>
-            <TextInput
-              style={styles.input}
-              value={editAge}
-              onChangeText={setEditAge}
-              keyboardType="numeric"
-              placeholder="Umur dalam bulan"
-            />
-
-            <View style={styles.buttonRow}>
-              <TouchableOpacity
-                style={[styles.button, { backgroundColor: "#2a9d8f" }]}
-                onPress={saveEdit}
-              >
-                <Text style={styles.buttonText}>Simpan</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.button, { backgroundColor: "#888" }]}
-                onPress={() => {
-                  setIsEditing(false);
-                  // Reset form ke data asli bayi
-                  setEditName(baby.name);
-                  setEditAge(String(baby.age));
-                }}
-              >
-                <Text style={styles.buttonText}>Batal</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </>
-      )}
-
-      {/* Device status */}
+      {/* Status Perangkat */}
       <View style={styles.deviceContainer}>
-        <Text style={styles.deviceLabel}>Device Connected:</Text>
-        <Text style={styles.deviceValue}>
-          {baby.device ? baby.device : "Tidak ada"}
-        </Text>
+        <View>
+          <Text style={styles.deviceLabel}>Device Connected:</Text>
+          <Text style={styles.deviceValue}>{baby.device || "None"}</Text>
+        </View>
+        <Ionicons name="sync-circle" size={20} color="green" />
       </View>
 
+      {/* Info Bayi */}
+      {!isEditing ? (
+        <TouchableOpacity
+          style={styles.infoCard}
+          onPress={() => setIsEditing(true)}
+        >
+          <Image
+            source={require("../../assets/images/baby-boy.png")}
+            style={styles.image}
+          />
+          <View style={{ marginLeft: 16 }}>
+            <Text style={styles.name}>{baby.name}</Text>
+            <Text style={styles.info}>Umur: {baby.age} bulan</Text>
+          </View>
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.editCard}>
+          <Text style={styles.label}>Nama Bayi</Text>
+          <TextInput
+            style={styles.input}
+            value={editName}
+            onChangeText={setEditName}
+            placeholder="Nama Bayi"
+          />
+
+          <Text style={styles.label}>Umur (bulan)</Text>
+          <TextInput
+            style={styles.input}
+            value={editAge}
+            onChangeText={setEditAge}
+            keyboardType="numeric"
+            placeholder="Umur dalam bulan"
+          />
+
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={[styles.button, { backgroundColor: "#2a9d8f" }]}
+              onPress={saveEdit}
+            >
+              <Text style={styles.buttonText}>Simpan</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, { backgroundColor: "#888" }]}
+              onPress={() => {
+                setIsEditing(false);
+                setEditName(baby.name);
+                setEditAge(String(baby.age));
+              }}
+            >
+              <Text style={styles.buttonText}>Batal</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      <View style={styles.chartContainer}>
+        <LineChart
+          data={data}
+          color="#3185c4"
+          dataPointsColor1="red"
+          height={150}
+        />
+        <Text style={styles.chartLabel}>Riwayat Suhu</Text>
+      </View>
+
+      {/* Tombol Hapus */}
       <TouchableOpacity style={styles.deleteButton} onPress={deleteData}>
         <Text style={styles.deleteText}>Hapus Data Bayi</Text>
       </TouchableOpacity>
@@ -265,6 +262,26 @@ const styles = StyleSheet.create({
     width: "100%",
     marginBottom: 20,
   },
+  deviceContainer: {
+    width: "100%",
+    backgroundColor: "#d6ffdd",
+    padding: 16,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  deviceLabel: {
+    fontWeight: "bold",
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  deviceValue: {
+    fontSize: 14,
+    color: "#aaa",
+  },
   infoCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -290,20 +307,6 @@ const styles = StyleSheet.create({
   },
   info: {
     fontSize: 14,
-  },
-  deviceContainer: {
-    width: "100%",
-    backgroundColor: "#baffdd",
-    padding: 16,
-    borderRadius: 10,
-  },
-  deviceLabel: {
-    fontWeight: "bold",
-    fontSize: 16,
-    marginBottom: 4,
-  },
-  deviceValue: {
-    fontSize: 16,
   },
   editCard: {
     backgroundColor: "#fff",
@@ -345,16 +348,29 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     backgroundColor: "#ff4d4d",
-    padding: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
     borderRadius: 8,
-    width: "100%",
-    alignItems: "center",
-    marginBottom: 20,
-    marginTop: 20,
+    marginTop: 10,
   },
   deleteText: {
     color: "#fff",
     fontWeight: "bold",
+  },
+  chartContainer: {
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
+    width: "100%",
+    marginBottom: 20,
+  },
+  chartLabel: {
     fontSize: 16,
+    fontWeight: "bold",
   },
 });

@@ -4,7 +4,7 @@
     "slug": "teddy-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/Icon-teddy.png",
     "scheme": "teddyapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -13,12 +13,11 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/Icon-teddy.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.naufal_husnianto.teddyapp",
-      "Permissions": ["NOTIFICATIONS"]
+      "package": "com.naufal_husnianto.teddyapp"
     },
     "web": {
       "bundler": "metro",
@@ -30,13 +29,18 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/Icon-teddy.png",
           "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "resizeMode": "contain"
         }
       ]
     ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "45e22d63-f9cd-4cfd-9a88-f1364365313d"
+      }
+    },
     "experiments": {
       "typedRoutes": true
     }

@@ -33,7 +33,7 @@ export default function Login() {
       return;
     }
 
-    loginStart(); // Trigger loading hanya jika validasi lolos
+    loginStart();
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
@@ -41,13 +41,11 @@ export default function Login() {
     } catch (err) {
       setError("Invalid email or password");
     } finally {
-      loginEnd(); // Stop loading di sini, baik sukses atau gagal
+      loginEnd();
     }
   };
 
-  if (user) {
-    return <Redirect href="/dashboard" />;
-  }
+  if (user) return <Redirect href="/dashboard" />;
 
   return (
     <ImageBackground
@@ -56,47 +54,49 @@ export default function Login() {
       resizeMode="cover"
     >
       <View style={styles.overlay} />
-      <Text style={styles.title}>Login</Text>
-      <Image
-        source={require("../assets/images/Icon-teddy.png")}
-        style={{
-          width: 200,
-          height: 200,
-          marginBottom: 40,
-          marginTop: 20,
-          marginHorizontal: "auto",
-        }}
-      />
+      <View style={styles.header}>
+        <Text style={styles.title}>Login</Text>
+        <Image
+          source={require("../assets/images/Icon-teddy.png")}
+          style={styles.icon}
+        />
+      </View>
 
       <View style={styles.formContainer}>
-        <TextInput
-          placeholder="Email"
-          value={email}
-          onChangeText={setEmail}
-          style={styles.input}
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
-        <TextInput
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          style={styles.input}
-          secureTextEntry
-        />
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Email</Text>
+          <TextInput
+            placeholder="Enter your email"
+            placeholderTextColor="#888"
+            value={email}
+            onChangeText={setEmail}
+            style={styles.input}
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Password</Text>
+          <TextInput
+            placeholder="Enter your password"
+            placeholderTextColor="#888"
+            value={password}
+            onChangeText={setPassword}
+            style={styles.input}
+            secureTextEntry
+          />
+        </View>
 
         <TouchableOpacity style={styles.button} onPress={handleLogin}>
-          <Text style={{ color: "#fff", fontWeight: "bold" }}>Login</Text>
+          <Text style={styles.buttonText}>Login</Text>
         </TouchableOpacity>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <Text style={{ marginTop: 30 }}>
-          Don`t have an account?{" "}
-          <Text
-            style={styles.link}
-            onPress={() => router.push("/register")} // push ke register
-          >
+        <Text style={styles.registerText}>
+          Don’t have an account?{" "}
+          <Text style={styles.link} onPress={() => router.push("/register")}>
             Register
           </Text>
         </Text>
@@ -109,56 +109,83 @@ const styles = StyleSheet.create({
   loader: {
     flex: 1,
     justifyContent: "center",
+    backgroundColor: "#fff",
   },
   container: {
     flex: 1,
-    justifyContent: "space-between",
     backgroundColor: "#3185c4",
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(16, 100, 164, 0.8)", // semi-transparent blue
+    backgroundColor: "rgba(16, 100, 164, 0.8)",
   },
-  formContainer: {
-    borderTopLeftRadius: 50,
-    borderTopRightRadius: 50,
-    backgroundColor: "#fff",
-    height: "60%",
-    padding: 24,
-    justifyContent: "center",
+  header: {
     alignItems: "center",
-    gap: 20,
+    marginTop: 80,
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: "bold",
-    textAlign: "center",
     color: "#fff",
-    marginTop: 80,
+    marginBottom: 12,
+  },
+  icon: {
+    width: 160,
+    height: 160,
+    marginBottom: 24,
+  },
+  formContainer: {
+    flex: 1,
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    alignItems: "center",
+  },
+  inputGroup: {
+    width: "100%",
+    marginBottom: 20,
+  },
+  label: {
+    marginBottom: 8,
+    fontWeight: "600",
+    fontSize: 14,
+    color: "#333",
   },
   input: {
     height: 48,
-    width: "100%",
     borderColor: "#ccc",
     borderWidth: 1,
-    marginBottom: 16,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     borderRadius: 20,
+    backgroundColor: "#f9f9f9",
   },
   button: {
     backgroundColor: "#007AFF",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 20,
-    width: "60%",
+    paddingVertical: 14,
+    borderRadius: 24,
+    width: "100%",
     alignItems: "center",
+    marginTop: 10,
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
   },
   error: {
-    marginTop: 12,
     color: "red",
     textAlign: "center",
+    marginTop: 16,
+  },
+  registerText: {
+    marginTop: 32,
+    fontSize: 14,
+    color: "#444",
   },
   link: {
     color: "#007AFF",
+    fontWeight: "bold",
   },
 });
