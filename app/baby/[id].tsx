@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
+import { getDatabase, off, onValue, ref } from "firebase/database";
 import { deleteDoc, doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
@@ -23,6 +24,7 @@ export default function BabyDetail() {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editAge, setEditAge] = useState("");
+  const [deviceTemp, setDeviceTemp] = useState<number | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -42,7 +44,33 @@ export default function BabyDetail() {
     return () => unsub();
   }, [id]);
 
-  const getTemperatureCategory = (temp: number) => {
+  useEffect(() => {
+    if (!baby?.device) {
+      setDeviceTemp(null);
+      return;
+    }
+
+    const dbRealtime = getDatabase();
+    const deviceTempRef = ref(dbRealtime, `/${baby.device}/suhu`);
+
+    const unsubscribe = onValue(deviceTempRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const val = snapshot.val();
+        const tempNumber = typeof val === "number" ? val : Number(val);
+        setDeviceTemp(isNaN(tempNumber) ? null : tempNumber);
+      } else {
+        setDeviceTemp(null);
+      }
+    });
+
+    return () => {
+      off(deviceTempRef);
+    };
+  }, [baby?.device]);
+
+  // Perbaikan: menerima number | null, handle null
+  const getTemperatureCategory = (temp: number | null) => {
+    if (temp === null) return "Belum Terdeteksi";
     if (temp > 40.6) return "Demam Sangat Tinggi";
     if (temp >= 40.0) return "Demam Tinggi";
     if (temp >= 39.0) return "Demam Sedang";
@@ -51,7 +79,9 @@ export default function BabyDetail() {
     return "Belum Terdeteksi";
   };
 
-  const getTempColor = (temp: number) => {
+  // Perbaikan: menerima number | null, handle null
+  const getTempColor = (temp: number | null) => {
+    if (temp === null) return "#e0e0e0";
     if (temp > 40.6) return "#ff4d4d";
     if (temp >= 40.0) return "#ff4d4d";
     if (temp >= 39.0) return "#ffb347";
@@ -126,30 +156,42 @@ export default function BabyDetail() {
     );
   }
 
-  const tempColor = getTempColor(baby.temp);
+  const tempColor = getTempColor(deviceTemp);
 
   const data = [{ value: 15 }, { value: 30 }, { value: 26 }, { value: 40 }];
+
+  const handleDevicePress = () => {
+    router.push({
+      pathname: "/devices",
+      params: { babyId: String(id) },
+    });
+  };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       {/* Suhu Bayi */}
       <View style={[styles.circle, { borderColor: tempColor }]}>
-        <Text style={styles.temp}>{baby.temp}°C</Text>
+        <Text style={styles.temp}>
+          {deviceTemp !== null ? `${deviceTemp}°C` : "–"}
+        </Text>
       </View>
 
       <Text style={[styles.status, { backgroundColor: tempColor + "33" }]}>
         <Ionicons name="thermometer" size={20} color={tempColor} />{" "}
-        {getTemperatureCategory(baby.temp)}
+        {getTemperatureCategory(deviceTemp)}
       </Text>
 
       {/* Status Perangkat */}
-      <View style={styles.deviceContainer}>
+      <TouchableOpacity
+        style={styles.deviceContainer}
+        onPress={handleDevicePress}
+      >
         <View>
           <Text style={styles.deviceLabel}>Device Connected:</Text>
           <Text style={styles.deviceValue}>{baby.device || "None"}</Text>
         </View>
         <Ionicons name="sync-circle" size={20} color="green" />
-      </View>
+      </TouchableOpacity>
 
       {/* Info Bayi */}
       {!isEditing ? (
@@ -253,124 +295,119 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   status: {
-    fontSize: 16,
-    fontWeight: "bold",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
     color: "#333",
-    padding: 14,
-    borderRadius: 8,
-    textAlign: "center",
-    width: "100%",
+    fontWeight: "600",
     marginBottom: 20,
+    flexDirection: "row",
+    alignItems: "center",
   },
   deviceContainer: {
-    width: "100%",
-    backgroundColor: "#d6ffdd",
-    padding: 16,
-    paddingHorizontal: 20,
-    borderRadius: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    backgroundColor: "#fff",
+    padding: 12,
+    width: "100%",
+    borderRadius: 8,
     marginBottom: 20,
+    elevation: 2,
   },
   deviceLabel: {
-    fontWeight: "bold",
-    fontSize: 14,
-    marginBottom: 4,
+    fontSize: 16,
+    color: "#444",
   },
   deviceValue: {
-    fontSize: 14,
-    color: "#aaa",
+    fontWeight: "700",
+    fontSize: 18,
+    color: "#2a9d8f",
   },
   infoCard: {
     flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#ffffff",
+    backgroundColor: "#fff",
+    width: "100%",
     padding: 16,
     borderRadius: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 4,
-    width: "100%",
     marginBottom: 20,
+    elevation: 3,
+    alignItems: "center",
   },
   image: {
-    width: 60,
-    height: 60,
-    borderRadius: 40,
-    resizeMode: "cover",
+    width: 70,
+    height: 70,
   },
   name: {
-    fontSize: 16,
-    fontWeight: "bold",
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#222",
   },
   info: {
-    fontSize: 14,
+    fontSize: 16,
+    color: "#666",
+    marginTop: 4,
   },
   editCard: {
     backgroundColor: "#fff",
-    padding: 20,
-    borderRadius: 12,
     width: "100%",
+    padding: 16,
+    borderRadius: 12,
     marginBottom: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 4,
+    elevation: 3,
   },
   label: {
-    fontWeight: "bold",
+    fontSize: 16,
+    fontWeight: "600",
     marginBottom: 6,
+    color: "#444",
   },
   input: {
-    backgroundColor: "#f0f0f0",
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 8,
     marginBottom: 16,
+    fontSize: 16,
+    backgroundColor: "#fafafa",
   },
   buttonRow: {
     flexDirection: "row",
     justifyContent: "space-between",
   },
   button: {
+    flex: 1,
     paddingVertical: 12,
-    paddingHorizontal: 24,
+    marginHorizontal: 8,
     borderRadius: 8,
     alignItems: "center",
-    flex: 1,
-    marginHorizontal: 4,
   },
   buttonText: {
     color: "#fff",
-    fontWeight: "bold",
-  },
-  deleteButton: {
-    backgroundColor: "#ff4d4d",
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    borderRadius: 8,
-    marginTop: 10,
-  },
-  deleteText: {
-    color: "#fff",
-    fontWeight: "bold",
+    fontWeight: "700",
   },
   chartContainer: {
-    alignItems: "center",
-    backgroundColor: "#ffffff",
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 4,
     width: "100%",
     marginBottom: 20,
   },
   chartLabel: {
+    textAlign: "center",
+    marginTop: 8,
+    color: "#555",
+    fontWeight: "600",
+  },
+  deleteButton: {
+    backgroundColor: "#e63946",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    width: "100%",
+    alignItems: "center",
+  },
+  deleteText: {
+    color: "#fff",
+    fontWeight: "700",
     fontSize: 16,
-    fontWeight: "bold",
   },
 });

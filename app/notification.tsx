@@ -13,9 +13,9 @@ import { useAuth } from "./context/AuthContext";
 
 // Definisikan tipe notifikasi
 type NotificationItem = {
-  name: string;
+  babyName: string;
   category: string;
-  time: string; // ISO date string
+  createdAt: string; // ISO date string
 };
 
 export default function Notification() {
@@ -29,12 +29,14 @@ export default function Notification() {
   const fetchNotifications = async () => {
     try {
       const storedData = await AsyncStorage.getItem("notifications");
+
+      console.log("Notifikasi dari AsyncStorage:", storedData);
       if (storedData) {
         const parsedData: NotificationItem[] = JSON.parse(storedData);
         // Urutkan dari terbaru ke terlama berdasarkan waktu
         const sortedData = parsedData.sort(
           (a: NotificationItem, b: NotificationItem) =>
-            new Date(b.time).getTime() - new Date(a.time).getTime()
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
         setNotifications(sortedData);
       }
@@ -75,9 +77,9 @@ export default function Notification() {
       />
       <View style={{ flex: 1 }}>
         <Text style={styles.message}>
-          <Text style={styles.bold}>{item.name}</Text> {item.category}
+          <Text style={styles.bold}>{item.babyName}</Text> {item.category}
         </Text>
-        <Text style={styles.subtitle}>{formatDate(item.time)}</Text>
+        <Text style={styles.subtitle}>{formatDate(item.createdAt)}</Text>
       </View>
     </View>
   );

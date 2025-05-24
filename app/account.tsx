@@ -75,7 +75,7 @@ export default function Account() {
 
       {/* Menu Section */}
       <View style={styles.menuContainer}>
-        <TouchableOpacity
+        {/* <TouchableOpacity
           style={styles.menuItem}
           onPress={() => router.push("/account")}
         >
@@ -87,7 +87,7 @@ export default function Account() {
             color="black"
             style={{ marginLeft: "auto" }}
           />
-        </TouchableOpacity>
+        </TouchableOpacity> */}
 
         <TouchableOpacity
           style={styles.menuItem}

@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Redirect, router } from "expo-router";
+import { getDatabase, onValue, ref } from "firebase/database";
 import {
   addDoc,
   collection,
@@ -28,51 +29,149 @@ export default function Dashboard() {
   const [babyDevices, setBabyDevices] = useState<any[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [newBaby, setNewBaby] = useState({ name: "", age: "" });
-  const prevDevicesRef = useRef<any[]>([]); // Gunakan useRef agar tidak trigger re-render
+  const prevDevicesRef = useRef<any[]>([]);
+
+  console.log(babyDevices);
 
   useEffect(() => {
     if (!user) return;
 
+    const dbRealtime = getDatabase();
     const q = query(collection(db, "babies"), where("userId", "==", user.uid));
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      const babies = snapshot.docs.map((doc) => ({
+
+    const unsubscribeFirestore = onSnapshot(q, async (snapshot) => {
+      const babiesRaw = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
-      })) as any[];
+      }));
 
-      // Deteksi perubahan kategori suhu
-      for (let baby of babies) {
-        const prev = prevDevicesRef.current.find((d) => d.id === baby.id);
+      console.log("babyraw", babiesRaw);
+
+      // Bersihkan subscription sebelumnya
+      prevDevicesRef.current.forEach((baby) => {
+        if (baby._realtimeUnsub) {
+          baby._realtimeUnsub();
+        }
+      });
+
+      const babiesWithTemp: any[] = [];
+      const tempSubscriptions: (() => void)[] = [];
+
+      const handleTemperatureChange = async (
+        baby: any,
+        tempValue: number,
+        prevTemp: number | null
+      ) => {
         if (
-          prev &&
-          getTemperatureCategory(prev.temp) !==
-            getTemperatureCategory(baby.temp)
+          prevTemp !== null &&
+          getTemperatureCategory(prevTemp) !== getTemperatureCategory(tempValue)
         ) {
-          const kategoriBaru = getTemperatureCategory(baby.temp);
-          const info = {
-            name: baby.name,
+          const kategoriBaru = getTemperatureCategory(tempValue);
+
+          const newNotification = {
+            babyId: baby.id,
+            babyName: baby.name,
             category: kategoriBaru,
-            time: new Date().toISOString(),
+            temp: tempValue,
+            userId: user.uid,
+            createdAt: new Date().toISOString(),
           };
 
           try {
-            const existing = await AsyncStorage.getItem("notifications");
-            const parsed = existing ? JSON.parse(existing) : [];
-            parsed.push(info);
-            await AsyncStorage.setItem("notifications", JSON.stringify(parsed));
-            console.log("Notifikasi disimpan:", info);
-          } catch (e) {
-            console.error("Gagal menyimpan notifikasi ke AsyncStorage", e);
+            await saveNotificationToAsyncStorage(newNotification);
+            console.log("Notifikasi tersimpan:", baby.name, kategoriBaru);
+
+            // Tambahkan notifikasi ke state jika diperlukan
+            // setNotifications((prev) => [...prev, newNotification]);
+          } catch (err) {
+            console.error("Gagal menyimpan notifikasi ke AsyncStorage", err);
           }
         }
-      }
+      };
 
-      prevDevicesRef.current = babies; // Update ref setelah loop selesai
-      setBabyDevices(babies);
+      // Buat promise untuk semua subscription realtime
+      const subscriptionPromises = babiesRaw.map((baby) => {
+        return new Promise<void>((resolve) => {
+          const deviceName = baby.device;
+          if (!deviceName) {
+            babiesWithTemp.push({
+              ...baby,
+              temp: 0,
+              _realtimeUnsub: () => {},
+            });
+            return resolve();
+          }
+
+          const tempRef = ref(dbRealtime, `${deviceName}/suhu`);
+
+          const unsubscribeRealtime = onValue(tempRef, (snapshot) => {
+            const tempValue = snapshot.exists() ? snapshot.val() : null;
+            const currentTemp = tempValue ?? 0;
+
+            // Cari bayi di state sebelumnya untuk mendapatkan suhu sebelumnya
+            const prevBaby = prevDevicesRef.current.find(
+              (d) => d.id === baby.id
+            );
+            const prevTemp = prevBaby?.temp ?? null;
+
+            // Handle perubahan suhu
+            handleTemperatureChange(baby, currentTemp, prevTemp);
+
+            // Update data bayi
+            const babyIndex = babiesWithTemp.findIndex((d) => d.id === baby.id);
+            if (babyIndex >= 0) {
+              babiesWithTemp[babyIndex].temp = currentTemp;
+            } else {
+              babiesWithTemp.push({
+                ...baby,
+                temp: currentTemp,
+                _realtimeUnsub: unsubscribeRealtime,
+              });
+            }
+
+            // Update state
+            setBabyDevices([...babiesWithTemp]);
+            prevDevicesRef.current = [...babiesWithTemp];
+          });
+
+          tempSubscriptions.push(unsubscribeRealtime);
+          resolve();
+        });
+      });
+
+      Promise.all(subscriptionPromises).then(() => {
+        setBabyDevices([...babiesWithTemp]);
+        prevDevicesRef.current = [...babiesWithTemp];
+      });
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeFirestore();
+      prevDevicesRef.current.forEach((baby) => {
+        if (baby._realtimeUnsub) baby._realtimeUnsub();
+      });
+      prevDevicesRef.current = [];
+    };
   }, [user]);
+
+  const saveNotificationToAsyncStorage = async (notification: any) => {
+    try {
+      const existingNotificationsJson = await AsyncStorage.getItem(
+        "notifications"
+      );
+      const existingNotifications = existingNotificationsJson
+        ? JSON.parse(existingNotificationsJson)
+        : [];
+      const updatedNotifications = [notification, ...existingNotifications];
+      await AsyncStorage.setItem(
+        "notifications",
+        JSON.stringify(updatedNotifications)
+      );
+      console.log("Notifikasi tersimpan di AsyncStorage:", notification);
+    } catch (error) {
+      console.error("Gagal menyimpan notifikasi di AsyncStorage:", error);
+    }
+  };
 
   const handleAddBaby = async () => {
     if (!newBaby.name || !newBaby.age) return;
@@ -80,7 +179,6 @@ export default function Dashboard() {
     await addDoc(collection(db, "babies"), {
       name: newBaby.name,
       age: newBaby.age,
-      temp: 0,
       userId: user.uid,
       createdAt: serverTimestamp(),
     });
@@ -89,8 +187,7 @@ export default function Dashboard() {
     setModalVisible(false);
   };
 
-  const getTemperatureCategory = (tempStr: number) => {
-    const temp = Number(tempStr);
+  const getTemperatureCategory = (temp: number) => {
     if (temp > 40.6) return "Demam Sangat Tinggi";
     if (temp >= 40.0) return "Demam Tinggi";
     if (temp >= 39.0) return "Demam Sedang";
@@ -99,8 +196,8 @@ export default function Dashboard() {
     return "Belum Terdeteksi";
   };
 
-  const getCardColor = (tempStr: number) => {
-    const category = getTemperatureCategory(tempStr);
+  const getCardColor = (temp: number) => {
+    const category = getTemperatureCategory(temp);
     switch (category) {
       case "Suhu Normal":
         return "#d0f0c0";
@@ -123,7 +220,6 @@ export default function Dashboard() {
 
   return (
     <View style={styles.container}>
-      {/* Header Profil */}
       <TouchableOpacity
         style={styles.profileCard}
         onPress={() => router.push("/account")}
@@ -158,8 +254,6 @@ export default function Dashboard() {
       </TouchableOpacity>
 
       <Text style={styles.title}>Baby Status</Text>
-
-      {/* Daftar Bayi */}
       <ScrollView style={styles.deviceList}>
         {babyDevices.map((device) => {
           const category = getTemperatureCategory(device.temp);
@@ -203,7 +297,7 @@ export default function Dashboard() {
         })}
       </ScrollView>
 
-      {/* Tombol Tambah */}
+      {/* Modal dan tombol tambah bayi sama seperti sebelumnya */}
       <TouchableOpacity
         style={styles.fab}
         onPress={() => setModalVisible(true)}
@@ -211,7 +305,6 @@ export default function Dashboard() {
         <Ionicons name="add" size={32} color="white" />
       </TouchableOpacity>
 
-      {/* Modal Tambah Bayi */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -252,6 +345,8 @@ export default function Dashboard() {
   );
 }
 
+// Styles sama seperti sebelumnya (tidak saya ulang)
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -284,6 +379,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     paddingHorizontal: 20,
   },
+  accountButton: {
+    position: "absolute",
+    top: 20,
+    right: 20,
+  },
   deviceList: {
     flex: 1,
     paddingHorizontal: 20,
@@ -304,50 +404,49 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 24,
     right: 24,
-    backgroundColor: "#3185c4",
-    borderRadius: 30,
-    width: 60,
-    height: 60,
-    alignItems: "center",
+    backgroundColor: "#0033ff",
+    borderRadius: 32,
+    width: 64,
+    height: 64,
     justifyContent: "center",
+    alignItems: "center",
     elevation: 5,
-  },
-  accountButton: {
-    padding: 8,
-    marginLeft: "auto",
   },
   modalOverlay: {
     flex: 1,
+    backgroundColor: "rgba(0,0,0,0.3)",
     justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.4)",
-    padding: 20,
+    padding: 16,
   },
   modalView: {
     backgroundColor: "white",
-    borderRadius: 12,
-    padding: 20,
-    elevation: 5,
+    borderRadius: 16,
+    padding: 16,
   },
   modalTitle: {
-    fontSize: 18,
     fontWeight: "bold",
+    fontSize: 16,
     marginBottom: 12,
   },
   input: {
-    borderWidth: 1,
     borderColor: "#ccc",
+    borderWidth: 1,
     borderRadius: 8,
-    padding: 10,
     marginBottom: 12,
+    paddingHorizontal: 10,
+    height: 40,
   },
   modalButtons: {
     flexDirection: "row",
     justifyContent: "space-between",
   },
   modalBtn: {
-    backgroundColor: "#3185c4",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    backgroundColor: "#0033ff",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flex: 1,
+    marginHorizontal: 4,
+    alignItems: "center",
   },
 });

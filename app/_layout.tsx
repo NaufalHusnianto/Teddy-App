@@ -20,7 +20,7 @@ export default function RootLayout() {
                   flexDirection: "row",
                   alignItems: "center",
                   paddingHorizontal: 20,
-                  paddingTop: 36,
+                  paddingTop: 48,
                   paddingBottom: 24,
                 }}
               >
@@ -49,7 +49,7 @@ export default function RootLayout() {
                   flexDirection: "row",
                   alignItems: "center",
                   paddingHorizontal: 20,
-                  paddingTop: 36,
+                  paddingTop: 48,
                   paddingBottom: 24,
                 }}
               >
@@ -78,7 +78,7 @@ export default function RootLayout() {
                   flexDirection: "row",
                   alignItems: "center",
                   paddingHorizontal: 20,
-                  paddingTop: 36,
+                  paddingTop: 48,
                   paddingBottom: 24,
                 }}
               >
@@ -107,7 +107,7 @@ export default function RootLayout() {
                   flexDirection: "row",
                   alignItems: "center",
                   paddingHorizontal: 20,
-                  paddingTop: 36,
+                  paddingTop: 48,
                   paddingBottom: 24,
                 }}
               >
@@ -122,6 +122,35 @@ export default function RootLayout() {
                   style={{ fontSize: 18, fontWeight: "bold", marginLeft: 16 }}
                 >
                   Notifications
+                </Text>
+              </View>
+            ),
+          }}
+        />
+        <Stack.Screen
+          name="devices"
+          options={{
+            header: () => (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingHorizontal: 20,
+                  paddingTop: 48,
+                  paddingBottom: 24,
+                }}
+              >
+                <TouchableOpacity onPress={() => router.back()}>
+                  <Ionicons
+                    name="arrow-back-circle"
+                    size={24}
+                    color="#3185c4"
+                  />
+                </TouchableOpacity>
+                <Text
+                  style={{ fontSize: 18, fontWeight: "bold", marginLeft: 16 }}
+                >
+                  Devices
                 </Text>
               </View>
             ),

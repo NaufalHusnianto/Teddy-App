@@ -33,7 +33,9 @@
           "imageWidth": 200,
           "resizeMode": "contain"
         }
-      ]
+      ],
+      "expo-notifications",
+      "expo-background-task"
     ],
     "extra": {
       "router": {},
