@@ -18,7 +18,7 @@ const firebaseConfig = {
   storageBucket: "teddyapp-c6cc9.firebasestorage.app",
   messagingSenderId: "660696993639",
   appId: "1:660696993639:web:41e16de6565bf27aa929c2",
-  measurementId: "G-DC0P0SXKE6"
+  measurementId: "G-DC0P0SXKE6",
 };
 
 export const app = initializeApp(firebaseConfig);

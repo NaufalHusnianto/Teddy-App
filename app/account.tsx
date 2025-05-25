@@ -120,12 +120,14 @@ export default function Account() {
 
             <TextInput
               placeholder="New Display Name"
+              placeholderTextColor={"#ccc"}
               value={newDisplayName}
               onChangeText={setNewDisplayName}
               style={styles.input}
             />
             <TextInput
               placeholder="New Password"
+              placeholderTextColor={"#ccc"}
               value={newPassword}
               onChangeText={setNewPassword}
               secureTextEntry
@@ -262,6 +264,7 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 8,
     marginBottom: 10,
+    color: "black",
   },
   saveButton: {
     backgroundColor: "#3185c4",

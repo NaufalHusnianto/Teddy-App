@@ -10,7 +10,7 @@ import {
   serverTimestamp,
   where,
 } from "firebase/firestore";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Image,
   Modal,
@@ -23,6 +23,7 @@ import {
 } from "react-native";
 import { db } from "../firebaseConfig";
 import { useAuth } from "./context/AuthContext";
+import { startBackgroundTask } from "./utils/backgroundTask";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -30,8 +31,23 @@ export default function Dashboard() {
   const [modalVisible, setModalVisible] = useState(false);
   const [newBaby, setNewBaby] = useState({ name: "", age: "" });
   const prevDevicesRef = useRef<any[]>([]);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  console.log(babyDevices);
+  // console.log(babyDevices);
+
+  // useEffect(() => {
+  //   if (user) {
+  //     AsyncStorage.setItem("user", JSON.stringify(user));
+  //     startBackgroundTask(); // ✅ Start once
+  //     console.log("User logged in");
+  //   } else {
+  //     console.log("User not logged in");
+  //   }
+  // }, [user]);
+
+  useEffect(() => {
+    startBackgroundTask();
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -45,7 +61,7 @@ export default function Dashboard() {
         ...doc.data(),
       }));
 
-      console.log("babyraw", babiesRaw);
+      // console.log("babyraw", babiesRaw);
 
       // Bersihkan subscription sebelumnya
       prevDevicesRef.current.forEach((baby) => {
@@ -62,6 +78,8 @@ export default function Dashboard() {
         tempValue: number,
         prevTemp: number | null
       ) => {
+        const timestamp = Date.now();
+
         if (
           prevTemp !== null &&
           getTemperatureCategory(prevTemp) !== getTemperatureCategory(tempValue)
@@ -74,19 +92,23 @@ export default function Dashboard() {
             category: kategoriBaru,
             temp: tempValue,
             userId: user.uid,
-            createdAt: new Date().toISOString(),
+            createdAt: new Date(timestamp).toISOString(),
           };
 
           try {
             await saveNotificationToAsyncStorage(newNotification);
-            console.log("Notifikasi tersimpan:", baby.name, kategoriBaru);
-
-            // Tambahkan notifikasi ke state jika diperlukan
-            // setNotifications((prev) => [...prev, newNotification]);
+            // console.log("Notifikasi tersimpan:", baby.name, kategoriBaru);
           } catch (err) {
             console.error("Gagal menyimpan notifikasi ke AsyncStorage", err);
           }
         }
+
+        // ✅ Simpan history suhu setiap kali berubah (terlepas dari kategorinya)
+        await saveTemperatureHistory({
+          babyId: baby.id,
+          temp: tempValue,
+          timestamp,
+        });
       };
 
       // Buat promise untuk semua subscription realtime
@@ -152,7 +174,7 @@ export default function Dashboard() {
       });
       prevDevicesRef.current = [];
     };
-  }, [user]);
+  }, [user, refreshTrigger]);
 
   const saveNotificationToAsyncStorage = async (notification: any) => {
     try {
@@ -170,6 +192,24 @@ export default function Dashboard() {
       console.log("Notifikasi tersimpan di AsyncStorage:", notification);
     } catch (error) {
       console.error("Gagal menyimpan notifikasi di AsyncStorage:", error);
+    }
+  };
+
+  const saveTemperatureHistory = async (entry: {
+    babyId: string;
+    temp: number;
+    timestamp: number;
+  }) => {
+    try {
+      const historyJson = await AsyncStorage.getItem("temperatureHistory");
+      const history = historyJson ? JSON.parse(historyJson) : [];
+
+      // Simpan entri baru
+      history.push(entry);
+
+      await AsyncStorage.setItem("temperatureHistory", JSON.stringify(history));
+    } catch (error) {
+      console.error("Gagal menyimpan history suhu:", error);
     }
   };
 
@@ -193,7 +233,7 @@ export default function Dashboard() {
     if (temp >= 39.0) return "Demam Sedang";
     if (temp >= 37.6) return "Demam Ringan";
     if (temp >= 36.4 && temp <= 37.5) return "Suhu Normal";
-    return "Belum Terdeteksi";
+    return "Suhu Terlalu Rendah";
   };
 
   const getCardColor = (temp: number) => {
@@ -253,7 +293,16 @@ export default function Dashboard() {
         </TouchableOpacity>
       </TouchableOpacity>
 
-      <Text style={styles.title}>Baby Status</Text>
+      <View style={styles.statusHeader}>
+        <Text style={styles.title}>Baby Status</Text>
+        <TouchableOpacity
+          onPress={() => setRefreshTrigger((prev) => prev + 1)}
+          style={styles.refreshButton}
+        >
+          <Ionicons name="refresh" size={20} color="#3185c4" />
+        </TouchableOpacity>
+      </View>
+
       <ScrollView style={styles.deviceList}>
         {babyDevices.map((device) => {
           const category = getTemperatureCategory(device.temp);
@@ -316,12 +365,14 @@ export default function Dashboard() {
             <Text style={styles.modalTitle}>Tambah Data Bayi</Text>
             <TextInput
               placeholder="Nama Bayi"
+              placeholderTextColor={"#aaa"}
               style={styles.input}
               value={newBaby.name}
               onChangeText={(text) => setNewBaby({ ...newBaby, name: text })}
             />
             <TextInput
               placeholder="Umur (bulan)"
+              placeholderTextColor={"#aaa"}
               style={styles.input}
               keyboardType="numeric"
               value={newBaby.age}
@@ -379,6 +430,21 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     paddingHorizontal: 20,
   },
+  statusHeader: {
+    flexDirection: "row",
+    marginHorizontal: 20,
+    marginTop: 20,
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  refreshButton: {
+    backgroundColor: "#d6d6d6",
+    borderRadius: 8,
+    padding: 6,
+    marginBottom: 10,
+    marginRight: 20,
+  },
+
   accountButton: {
     position: "absolute",
     top: 20,

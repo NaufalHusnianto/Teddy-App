@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { useAuth } from "./context/AuthContext";
+import { TestNotificationButton } from "./utils/backgroundTask";
 
 // Definisikan tipe notifikasi
 type NotificationItem = {
@@ -30,7 +31,7 @@ export default function Notification() {
     try {
       const storedData = await AsyncStorage.getItem("notifications");
 
-      console.log("Notifikasi dari AsyncStorage:", storedData);
+      // console.log("Notifikasi dari AsyncStorage:", storedData);
       if (storedData) {
         const parsedData: NotificationItem[] = JSON.parse(storedData);
         // Urutkan dari terbaru ke terlama berdasarkan waktu
@@ -88,6 +89,7 @@ export default function Notification() {
 
   return (
     <View style={styles.container}>
+      <TestNotificationButton />
       <TouchableOpacity style={styles.clearButton} onPress={clearNotifications}>
         <Text style={styles.clearButtonText}>Clear Notifications</Text>
       </TouchableOpacity>

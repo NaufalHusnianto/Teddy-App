@@ -1,5 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Print from "expo-print";
 import { router, useLocalSearchParams } from "expo-router";
+import { shareAsync } from "expo-sharing";
 import { getDatabase, off, onValue, ref } from "firebase/database";
 import { deleteDoc, doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
@@ -25,6 +28,173 @@ export default function BabyDetail() {
   const [editName, setEditName] = useState("");
   const [editAge, setEditAge] = useState("");
   const [deviceTemp, setDeviceTemp] = useState<number | null>(null);
+
+  const [temperatureHistory, setTemperatureHistory] = useState<any[]>([]);
+
+  const [selectedPrinter, setSelectedPrinter] = useState();
+
+  const generateHistoryHTML = () => {
+    return `
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          h1 { color: #3185c4; text-align: center; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; }
+          .header { display: flex; justify-content: space-between; margin-bottom: 20px; }
+          .baby-info { margin-bottom: 20px; }
+          .status { 
+            padding: 5px 10px; 
+            border-radius: 5px; 
+            display: inline-block;
+            margin-top: 10px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Record Suhu Teddy</h1>
+          <div>
+            <p>Tanggal: ${new Date().toLocaleDateString()}</p>
+            <p>Jam: ${new Date().toLocaleTimeString()}</p>
+          </div>
+        </div>
+        
+        <div class="baby-info">
+          <h2>Informasi Bayi</h2>
+          <p><strong>Nama:</strong> ${baby?.name || "-"}</p>
+          <p><strong>Umur:</strong> ${baby?.age || "-"} bulan</p>
+          <p><strong>Suhu Terakhir:</strong> ${
+            deviceTemp !== null ? `${deviceTemp}°C` : "-"
+          }</p>
+          <div class="status" style="background-color: ${tempColor}33; color: #333;">
+            Status: ${getTemperatureCategory(deviceTemp)}
+          </div>
+        </div>
+        
+        <h2>Riwayat Suhu 24 Jam Terakhir</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Waktu</th>
+              <th>Suhu (°C)</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${temperatureHistory
+              .map(
+                (entry) => `
+              <tr>
+                <td>${entry.label}</td>
+                <td>${entry.value}</td>
+                <td>${getTemperatureCategory(entry.value)}</td>
+              </tr>
+            `
+              )
+              .join("")}
+            ${
+              temperatureHistory.length === 0
+                ? `
+              <tr>
+                <td colspan="3" style="text-align: center;">Tidak ada data suhu</td>
+              </tr>
+            `
+                : ""
+            }
+          </tbody>
+        </table>
+        
+        <div style="margin-top: 30px; text-align: center; font-size: 12px; color: #777;">
+          Dokumen ini dicetak secara otomatis dari aplikasi Baby Temperature Monitor
+        </div>
+      </body>
+    </html>
+    `;
+  };
+
+  const print = async () => {
+    try {
+      const historyHtml = generateHistoryHTML();
+      await Print.printAsync({
+        html: historyHtml,
+        printerUrl: selectedPrinter?.url,
+      });
+    } catch (error) {
+      console.error("Failed to print:", error);
+      Alert.alert("Error", "Gagal mencetak dokumen");
+    }
+  };
+
+  const printToFile = async () => {
+    try {
+      const historyHtml = generateHistoryHTML();
+      const { uri } = await Print.printToFileAsync({
+        html: historyHtml,
+        width: 595, // A4 width in pixels at 72dpi
+        height: 842, // A4 height in pixels at 72dpi
+      });
+      console.log("File has been saved to:", uri);
+      await shareAsync(uri, { UTI: ".pdf", mimeType: "application/pdf" });
+    } catch (error) {
+      console.error("Failed to generate PDF:", error);
+      Alert.alert("Error", "Gagal membuat dokumen PDF");
+    }
+  };
+
+  const selectPrinter = async () => {
+    const printer = await Print.selectPrinterAsync(); // iOS only
+    setSelectedPrinter(printer);
+  };
+
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const historyJson = await AsyncStorage.getItem("temperatureHistory");
+        const allHistory = historyJson ? JSON.parse(historyJson) : [];
+
+        // Filter history for current baby and sort by timestamp
+        const babyHistory = allHistory
+          .filter((entry: any) => entry.babyId === id)
+          .sort((a: any, b: any) => a.timestamp - b.timestamp)
+          .map((entry: any) => ({
+            value: entry.temp,
+            label: new Date(entry.timestamp).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            date: new Date(entry.timestamp),
+            dataPointText: `${entry.temp}°C`,
+            labelTextStyle: { color: "gray", width: 60 },
+          }));
+
+        setTemperatureHistory(babyHistory);
+      } catch (error) {
+        console.error("Failed to load temperature history:", error);
+      }
+    };
+
+    loadHistory();
+  }, [id]);
+
+  // Format chart data
+  const chartData =
+    temperatureHistory.length > 0
+      ? temperatureHistory
+      : [{ value: 0, label: "No data" }];
+
+  // Calculate min/max for y-axis
+  const minTemp =
+    temperatureHistory.length > 0
+      ? Math.min(...temperatureHistory.map((item) => item.value)) - 1
+      : 0;
+  const maxTemp =
+    temperatureHistory.length > 0
+      ? Math.max(...temperatureHistory.map((item) => item.value)) + 1
+      : 40;
 
   useEffect(() => {
     if (!id) return;
@@ -76,7 +246,7 @@ export default function BabyDetail() {
     if (temp >= 39.0) return "Demam Sedang";
     if (temp >= 37.6) return "Demam Ringan";
     if (temp >= 36.4 && temp <= 37.5) return "Normal";
-    return "Belum Terdeteksi";
+    return "Suhu Terlalu Rendah";
   };
 
   // Perbaikan: menerima number | null, handle null
@@ -87,7 +257,44 @@ export default function BabyDetail() {
     if (temp >= 39.0) return "#ffb347";
     if (temp >= 37.6) return "#ffb347";
     if (temp >= 36.4 && temp <= 37.5) return "#2a9d8f";
-    return "#e0e0e0";
+    return "#ff4d4d";
+  };
+
+  const resetTemperatureHistory = async () => {
+    Alert.alert(
+      "Reset Riwayat Suhu",
+      "Apakah Anda yakin ingin mereset riwayat suhu?",
+      [
+        {
+          text: "Batal",
+          style: "cancel",
+        },
+        {
+          text: "Reset",
+          onPress: async () => {
+            try {
+              const historyJson = await AsyncStorage.getItem(
+                "temperatureHistory"
+              );
+              const allHistory = historyJson ? JSON.parse(historyJson) : [];
+
+              const filteredHistory = allHistory.filter(
+                (entry: any) => entry.babyId !== id
+              );
+              await AsyncStorage.setItem(
+                "temperatureHistory",
+                JSON.stringify(filteredHistory)
+              );
+              setTemperatureHistory([]);
+              Alert.alert("Sukses", "Riwayat suhu telah direset.");
+            } catch (error) {
+              console.error("Gagal mereset riwayat:", error);
+              Alert.alert("Error", "Gagal mereset riwayat.");
+            }
+          },
+        },
+      ]
+    );
   };
 
   const saveEdit = async () => {
@@ -248,19 +455,57 @@ export default function BabyDetail() {
         </View>
       )}
 
-      <View style={styles.chartContainer}>
+      <TouchableOpacity style={styles.chartContainer}>
         <LineChart
-          data={data}
+          data={chartData}
           color="#3185c4"
-          dataPointsColor1="red"
-          height={150}
+          dataPointsColor="#3185c4"
+          height={200}
+          width={300}
+          yAxisColor="#3185c4"
+          xAxisColor="#3185c4"
+          noOfSections={5}
+          maxValue={maxTemp}
+          minValue={minTemp}
+          spacing={40}
+          initialSpacing={10}
+          yAxisTextStyle={{ color: "gray" }}
+          xAxisLabelTextStyle={{ color: "gray", width: 60 }}
+          showReferenceLine1
+          referenceLine1Position={37.5}
+          referenceLine1Config={{
+            color: "red",
+            dashWidth: 2,
+            dashGap: 3,
+          }}
+          referenceLine1Label="Normal"
+          showReferenceLine2
+          referenceLine2Position={36.5}
+          referenceLine2Config={{
+            color: "red",
+            dashWidth: 2,
+            dashGap: 3,
+          }}
+          curved
+          isAnimated
         />
-        <Text style={styles.chartLabel}>Riwayat Suhu</Text>
-      </View>
+        <Text style={styles.chartLabel}>Riwayat Suhu 24 Jam Terakhir</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.deleteButton}
+        onPress={resetTemperatureHistory}
+      >
+        <Text style={styles.buttonText}>Reset History</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity onPress={printToFile} style={styles.printerButton}>
+        <Text style={styles.buttonText}>Cetak Laporan</Text>
+      </TouchableOpacity>
 
       {/* Tombol Hapus */}
       <TouchableOpacity style={styles.deleteButton} onPress={deleteData}>
-        <Text style={styles.deleteText}>Hapus Data Bayi</Text>
+        <Text style={styles.buttonText}>Hapus Data Bayi</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -389,7 +634,7 @@ const styles = StyleSheet.create({
   },
   chartContainer: {
     width: "100%",
-    marginBottom: 20,
+    marginVertical: 32,
   },
   chartLabel: {
     textAlign: "center",
@@ -405,9 +650,21 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "center",
   },
-  deleteText: {
-    color: "#fff",
-    fontWeight: "700",
+  spacer: {
+    height: 20,
+  },
+  printer: {
     fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
+  printerButton: {
+    backgroundColor: "#007AFF",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    width: "100%",
+    alignItems: "center",
+    marginVertical: 15,
   },
 });

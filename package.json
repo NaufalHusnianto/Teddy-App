@@ -44,7 +44,12 @@
     "react-native-svg": "15.11.2",
     "react-native-web": "~0.20.0",
     "react-native-webview": "13.13.5",
-    "expo-background-task": "~0.2.7"
+    "expo-task-manager": "~13.1.5",
+    "expo-background-fetch": "~13.1.5",
+    "@react-native-picker/picker": "2.11.0",
+    "expo-background-task": "~0.2.7",
+    "expo-print": "~14.1.4",
+    "expo-sharing": "~13.1.5"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

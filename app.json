@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "teddy-app",
+    "name": "Teddy",
     "slug": "teddy-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -34,7 +34,24 @@
           "resizeMode": "contain"
         }
       ],
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "color": "#ffffff",
+          "defaultChannel": "default",
+          "enableBackgroundRemoteNotifications": true
+        }
+      ],
+      [
+        "expo-background-fetch",
+        {
+          "minimumInterval": 10,
+          "stopOnTerminate": false,
+          "startOnBoot": true,
+          "enabled": true,
+          "taskName": "temperature-monitoring-task"
+        }
+      ],
       "expo-background-task"
     ],
     "extra": {
